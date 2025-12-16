@@ -3,14 +3,11 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
-	"runtime"
-	"syscall"
 
 	pubsub "github.com/bootdotdev/learn-pub-sub-starter/internal"
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
+
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 )
 
 func main() {
@@ -23,9 +20,9 @@ func main() {
 	}
 
 	defer conn.Close()
-	fmt.Println("connection successful")
+	fmt.Println("connection successful (server)")
 
-	newChan, err := conn.Channel()
+	publishChan, err := conn.Channel()
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
@@ -33,13 +30,15 @@ func main() {
 	state := routing.PlayingState{
 		IsPaused: true,
 	}
-	pubsub.PublishJSON[routing.PlayingState](newChan, routing.ExchangePerilDirect, routing.PauseKey, state)
+	err = pubsub.PublishJSON(publishChan, routing.ExchangePerilDirect, routing.PauseKey, state)
+	if err != nil {
+		log.Printf("could not publish time: %v", err)
+	}
+	fmt.Println("pause message sent!")
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
-	<-sigChan // INFO: Blocker
-	fmt.Println("signal received, shutting down the connection")
-	conn.Close()
-
-	fmt.Printf("(Number of goroutines: %d)\n", runtime.NumGoroutine())
+	// sigChan := make(chan os.Signal, 1)
+	// signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+	// <-sigChan // INFO: Blocker
+	// fmt.Println("signal received, shutting down the connection")
+	// conn.Close()
 }
