@@ -26,36 +26,33 @@ func main() {
 	defer conn.Close()
 	fmt.Println("connection successful (client)")
 
-	// publishChan, err := conn.Channel()
-	// if err != nil {
-	// 	log.Fatalf("could not create channel: %v", err)
-	// }
-
 	// ---------- INFO let's put the stuff here
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {
-		log.Println("idk how but you fucked up entering a username. we're just gonna call you bib")
-	}
-	if len(username) == 0 {
-		username = "bib"
+		log.Fatalf("couldn't get user name: %v", err)
 	}
 
-	ch, q, err := pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, routing.PauseKey+"."+username, routing.PauseKey, pubsub.Transient)
-	log.Printf("queue name: %s", q.Name)
+	_, q, err := pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, routing.PauseKey+"."+username, routing.PauseKey, pubsub.Transient)
+	if err != nil {
+		log.Fatalf("could not subscribe to pause %v", err)
+	}
+
+	fmt.Printf("queue %s declared and bound!\n", q.Name)
 
 	// -----------------
-	state := routing.PlayingState{
-		IsPaused: true,
-	}
-	err = pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, state)
-	if err != nil {
-		log.Printf("could not publish time: %v", err)
-	}
-	fmt.Println("pause message sent!")
+
+	// state := routing.PlayingState{
+	// 	IsPaused: true,
+	// }
+	// err = pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, state)
+	// if err != nil {
+	// 	log.Printf("could not publish time: %v", err)
+	// }
+	// fmt.Println("pause message sent!")
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sigChan // INFO: Blocker
-	fmt.Println("signal received, shutting down the connection")
-	conn.Close()
+	fmt.Println("signal received, RabbitMQ connection closed")
+	// conn.Close()
 }
