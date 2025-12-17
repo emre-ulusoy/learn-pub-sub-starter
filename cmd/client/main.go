@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	pubsub "github.com/bootdotdev/learn-pub-sub-starter/internal"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -23,12 +26,12 @@ func main() {
 	defer conn.Close()
 	fmt.Println("connection successful (client)")
 
-	publishChan, err := conn.Channel()
-	if err != nil {
-		log.Fatalf("could not create channel: %v", err)
-	}
+	// publishChan, err := conn.Channel()
+	// if err != nil {
+	// 	log.Fatalf("could not create channel: %v", err)
+	// }
 
-	// INFO let's put the stuff here
+	// ---------- INFO let's put the stuff here
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {
 		log.Println("idk how but you fucked up entering a username. we're just gonna call you bib")
@@ -37,12 +40,22 @@ func main() {
 		username = "bib"
 	}
 
+	ch, q, err := pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, routing.PauseKey+"."+username, routing.PauseKey, pubsub.Transient)
+	log.Printf("queue name: %s", q.Name)
+
+	// -----------------
 	state := routing.PlayingState{
 		IsPaused: true,
 	}
-	err = pubsub.PublishJSON(publishChan, routing.ExchangePerilDirect, routing.PauseKey, state)
+	err = pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, state)
 	if err != nil {
 		log.Printf("could not publish time: %v", err)
 	}
 	fmt.Println("pause message sent!")
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+	<-sigChan // INFO: Blocker
+	fmt.Println("signal received, shutting down the connection")
+	conn.Close()
 }
