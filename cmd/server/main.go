@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	pubsub "github.com/bootdotdev/learn-pub-sub-starter/internal"
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"

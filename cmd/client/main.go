@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	pubsub "github.com/bootdotdev/learn-pub-sub-starter/internal"
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
@@ -32,7 +32,7 @@ func main() {
 		log.Fatalf("couldn't get user name: %v", err)
 	}
 
-	_, q, err := pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, routing.PauseKey+"."+username, routing.PauseKey, pubsub.Transient)
+	_, q, err := pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, routing.PauseKey+"."+username, routing.PauseKey, pubsub.SimpleQueueTransient)
 	if err != nil {
 		log.Fatalf("could not subscribe to pause %v", err)
 	}
