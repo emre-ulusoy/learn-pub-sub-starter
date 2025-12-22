@@ -56,3 +56,9 @@ func main() {
 	fmt.Println("signal received, RabbitMQ connection closed")
 	// conn.Close()
 }
+
+func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
+	return func(routing.PlayingState) {
+
+	}
+}
