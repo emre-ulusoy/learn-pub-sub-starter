@@ -26,7 +26,6 @@ func main() {
 	defer conn.Close()
 	fmt.Println("connection successful (client)")
 
-	// ---------- INFO let's put the stuff here
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {
 		log.Fatalf("couldn't get user name: %v", err)
@@ -39,7 +38,16 @@ func main() {
 
 	fmt.Printf("queue %s declared and bound!\n", q.Name)
 
-	// -----------------
+	// INFO ch4
+	gs := gamelogic.NewGameState(username)
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilDirect,
+		"pause."+username,
+		routing.PauseKey,
+		pubsub.SimpleQueueTransient,
+		handlerPause(gs),
+	)
 
 	// state := routing.PlayingState{
 	// 	IsPaused: true,
@@ -58,7 +66,8 @@ func main() {
 }
 
 func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
-	return func(routing.PlayingState) {
-
+	return func(playingState routing.PlayingState) {
+		defer fmt.Print("> ")
+		gs.HandlePause(playingState)
 	}
 }
