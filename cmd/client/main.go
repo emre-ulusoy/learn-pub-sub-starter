@@ -3,71 +3,75 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
-
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
-	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func main() {
 	fmt.Println("Starting Peril client...")
+	const rabbitConnString = "amqp://guest:guest@localhost:5672/"
 
-	connStr := "amqp://guest:guest@localhost:5672/"
-	conn, err := amqp.Dial(connStr)
+	conn, err := amqp.Dial(rabbitConnString)
 	if err != nil {
-		log.Fatalf(err.Error())
+		log.Fatalf("could not connect to RabbitMQ: %v", err)
 	}
-
 	defer conn.Close()
-	fmt.Println("connection successful (client)")
+	fmt.Println("Peril game client connected to RabbitMQ!")
 
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {
-		log.Fatalf("couldn't get user name: %v", err)
+		log.Fatalf("could not get username: %v", err)
 	}
 
-	_, q, err := pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, routing.PauseKey+"."+username, routing.PauseKey, pubsub.SimpleQueueTransient)
-	if err != nil {
-		log.Fatalf("could not subscribe to pause %v", err)
-	}
-
-	fmt.Printf("queue %s declared and bound!\n", q.Name)
-
-	// INFO ch4
-	gs := gamelogic.NewGameState(username)
-	err = pubsub.SubscribeJSON(
+	_, queue, err := pubsub.DeclareAndBind(
 		conn,
 		routing.ExchangePerilDirect,
-		"pause."+username,
+		routing.PauseKey+"."+username,
 		routing.PauseKey,
 		pubsub.SimpleQueueTransient,
-		handlerPause(gs),
 	)
+	if err != nil {
+		log.Fatalf("could not subscribe to pause: %v", err)
+	}
+	fmt.Printf("Queue %v declared and bound!\n", queue.Name)
 
-	// state := routing.PlayingState{
-	// 	IsPaused: true,
-	// }
-	// err = pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, state)
-	// if err != nil {
-	// 	log.Printf("could not publish time: %v", err)
-	// }
-	// fmt.Println("pause message sent!")
+	gs := gamelogic.NewGameState(username)
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
-	<-sigChan // INFO: Blocker
-	fmt.Println("signal received, RabbitMQ connection closed")
-	// conn.Close()
-}
+	for {
+		words := gamelogic.GetInput()
+		if len(words) == 0 {
+			continue
+		}
+		switch words[0] {
+		case "move":
+			_, err := gs.CommandMove(words)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
 
-func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
-	return func(playingState routing.PlayingState) {
-		defer fmt.Print("> ")
-		gs.HandlePause(playingState)
+			// TODO: publish the move
+		case "spawn":
+			err = gs.CommandSpawn(words)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+		case "status":
+			gs.CommandStatus()
+		case "help":
+			gamelogic.PrintClientHelp()
+		case "spam":
+			// TODO: publish n malicious logs
+			fmt.Println("Spamming not allowed yet!")
+		case "quit":
+			gamelogic.PrintQuit()
+			return
+		default:
+			fmt.Println("unknown command")
+		}
 	}
 }
