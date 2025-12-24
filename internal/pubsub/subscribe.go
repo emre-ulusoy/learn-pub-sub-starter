@@ -29,9 +29,9 @@ func SubscribeJSON[T any](
 
 	go func() {
 		for msg := range incomingMsg {
-			var genericMsg *T
-			json.Unmarshal(msg.Body, genericMsg)
-			handler(*genericMsg)
+			var genericMsg T
+			json.Unmarshal(msg.Body, &genericMsg)
+			handler(genericMsg)
 			msg.Ack(false)
 
 		}
