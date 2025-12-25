@@ -47,6 +47,18 @@ func main() {
 
 	err = pubsub.SubscribeJSON(
 		conn,
+		routing.ExchangePerilTopic,
+		"army_moves."+username,
+		routing.ArmyMovesPrefix+".*",
+		pubsub.SimpleQueueTransient,
+		handlerMove(gs),
+	)
+	if err != nil {
+		log.Fatalf("could not subscribe to move: %v", err)
+	}
+
+	err = pubsub.SubscribeJSON(
+		conn,
 		routing.ExchangePerilDirect,
 		"pause."+username,
 		routing.PauseKey,
@@ -56,27 +68,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("could not subscribe to pause: %v", err)
 	}
-
-	// moveChan, moveQueue, err := pubsub.DeclareAndBind(
-	// 	conn,
-	// 	routing.ExchangePerilTopic,
-	// 	"army_moves."+username,
-	// 	routing.ArmyMovesPrefix,
-	// 	pubsub.SimpleQueueTransient,
-	// )
-	// if err != nil {
-	// 	log.Fatalf("could not subscribe to move: %v", err)
-	// }
-	// fmt.Printf("Queue %v declared and bound!\n", moveQueue.Name)
-
-	err = pubsub.SubscribeJSON(
-		conn,
-		routing.ExchangePerilTopic,
-		"army_moves."+username,
-		routing.ArmyMovesPrefix+".*",
-		pubsub.SimpleQueueTransient,
-		handlerMove(gs),
-	)
 
 	for { // INFO REPL
 		words := gamelogic.GetInput()
@@ -90,13 +81,17 @@ func main() {
 				fmt.Println(err)
 				continue
 			}
-			pubsub.PublishJSON(
+			err = pubsub.PublishJSON(
 				publishChan,
 				routing.ExchangePerilTopic,
 				"army_moves."+username,
 				move,
 			)
-			fmt.Println("move published successfully")
+			if err != nil {
+				fmt.Printf("error: %s\n", err)
+				continue
+			}
+			fmt.Println("Moved %v units to %s\n", len(move.Units), move.ToLocation)
 		case "spawn":
 			err = gs.CommandSpawn(words)
 			if err != nil {
