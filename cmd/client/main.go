@@ -26,7 +26,7 @@ func main() {
 		log.Fatalf("could not get username: %v", err)
 	}
 
-	_, queue, err := pubsub.DeclareAndBind(
+	ch, queue, err := pubsub.DeclareAndBind(
 		conn,
 		routing.ExchangePerilDirect,
 		routing.PauseKey+"."+username,
@@ -47,21 +47,38 @@ func main() {
 		pubsub.SimpleQueueTransient,
 		handlerPause(gs),
 	)
+	if err != nil {
+		log.Fatalf("could not subscribe to pause: %v", err)
+	}
 
-	for {
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilTopic,
+		"army_moves."+username,
+		routing.ArmyMovesPrefix,
+		pubsub.SimpleQueueTransient,
+		handlerMove(gs),
+	)
+
+	for { // INFO REPL
 		words := gamelogic.GetInput()
 		if len(words) == 0 {
 			continue
 		}
 		switch words[0] {
 		case "move":
-			_, err := gs.CommandMove(words)
+			move, err := gs.CommandMove(words)
 			if err != nil {
 				fmt.Println(err)
 				continue
 			}
-
-			// TODO: publish the move
+			pubsub.PublishJSON(
+				ch,
+				routing.ExchangePerilTopic,
+				"army_moves."+username,
+				move,
+			)
+			fmt.Println("move published successfully")
 		case "spawn":
 			err = gs.CommandSpawn(words)
 			if err != nil {
@@ -73,7 +90,7 @@ func main() {
 		case "help":
 			gamelogic.PrintClientHelp()
 		case "spam":
-			// TODO: publish n malicious logs
+			// TODO publish n malicious logs
 			fmt.Println("Spamming not allowed yet!")
 		case "quit":
 			gamelogic.PrintQuit()
@@ -88,6 +105,13 @@ func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
 	return func(playingState routing.PlayingState) {
 		defer fmt.Print("> ")
 		gs.HandlePause(playingState)
+	}
+}
+
+func handlerMove(gs *gamelogic.GameState) func(gamelogic.ArmyMove) {
+	return func(move gamelogic.ArmyMove) {
+		defer fmt.Print("> ")
+		gs.HandleMove(move)
 	}
 }
 
