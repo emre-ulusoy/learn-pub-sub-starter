@@ -21,17 +21,12 @@ func main() {
 	defer conn.Close()
 	fmt.Println("Peril game client connected to RabbitMQ!")
 
-	publishChan, err := conn.Channel()
-	if err != nil {
-		log.Fatalf("could not create channel: %v", err)
-	}
-
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {
 		log.Fatalf("could not get username: %v", err)
 	}
 
-	_, pauseQueue, err := pubsub.DeclareAndBind(
+	ch, queue, err := pubsub.DeclareAndBind(
 		conn,
 		routing.ExchangePerilDirect,
 		routing.PauseKey+"."+username,
@@ -41,10 +36,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("could not subscribe to pause: %v", err)
 	}
-	fmt.Printf("Queue %v declared and bound!\n", pauseQueue.Name)
+	fmt.Printf("Queue %v declared and bound!\n", queue.Name)
 
 	gs := gamelogic.NewGameState(username)
-
 	err = pubsub.SubscribeJSON(
 		conn,
 		routing.ExchangePerilTopic,
@@ -127,3 +121,4 @@ func handlerMove(gs *gamelogic.GameState) func(gamelogic.ArmyMove) {
 		gs.HandleMove(move)
 	}
 }
+
