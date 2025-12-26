@@ -26,7 +26,7 @@ func main() {
 		log.Fatalf("could not get username: %v", err)
 	}
 
-	ch, queue, err := pubsub.DeclareAndBind(
+	publishChan, queue, err := pubsub.DeclareAndBind(
 		conn,
 		routing.ExchangePerilDirect,
 		routing.PauseKey+"."+username,
@@ -108,17 +108,31 @@ func main() {
 	}
 }
 
-func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
-	return func(playingState routing.PlayingState) {
+func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) pubsub.Acktype {
+	return func(playingState routing.PlayingState) pubsub.Acktype {
 		defer fmt.Print("> ")
 		gs.HandlePause(playingState)
+		return pubsub.Ack
 	}
 }
 
-func handlerMove(gs *gamelogic.GameState) func(gamelogic.ArmyMove) {
-	return func(move gamelogic.ArmyMove) {
+func handlerMove(gs *gamelogic.GameState) func(gamelogic.ArmyMove) pubsub.Acktype {
+	return func(move gamelogic.ArmyMove) pubsub.Acktype {
 		defer fmt.Print("> ")
-		gs.HandleMove(move)
+		outcome := gs.HandleMove(move)
+		switch outcome {
+		case gamelogic.MoveOutComeSafe:
+			return pubsub.Ack
+
+		case gamelogic.MoveOutcomeMakeWar:
+			return pubsub.Ack
+
+		case gamelogic.MoveOutcomeSamePlayer:
+			return pubsub.NackDiscard
+
+		default:
+			fmt.Println("error: unknown move")
+			return pubsub.NackDiscard
+		}
 	}
 }
-
