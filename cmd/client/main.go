@@ -125,13 +125,36 @@ func handlerMove(gs *gamelogic.GameState) func(gamelogic.ArmyMove) pubsub.Acktyp
 			return pubsub.Ack
 
 		case gamelogic.MoveOutcomeMakeWar:
-			return pubsub.Ack
+			pubsub.PublishJSON()
+			return pubsub.NackRequeue
 
 		case gamelogic.MoveOutcomeSamePlayer:
 			return pubsub.NackDiscard
 
 		default:
 			fmt.Println("error: unknown move")
+			return pubsub.NackDiscard
+		}
+	}
+}
+
+func handlerMakeWar(gs *gamelogic.GameState) func() pubsub.Acktype {
+	return func() pubsub.Acktype {
+		defer fmt.Print("> ")
+		outcome, winner, loser := gs.HandleWar()
+		switch outcome {
+		case gamelogic.WarOutcomeNotInvolved:
+			return pubsub.NackRequeue
+		case gamelogic.WarOutcomeNoUnits:
+			return pubsub.NackDiscard
+		case gamelogic.WarOutcomeOpponentWon:
+			return pubsub.Ack
+		case gamelogic.WarOutcomeYouWon:
+			return pubsub.Ack
+		case gamelogic.WarOutcomeDraw:
+			return pubsub.Ack
+		default:
+			fmt.Println("error: unrecognizable war outcome")
 			return pubsub.NackDiscard
 		}
 	}
